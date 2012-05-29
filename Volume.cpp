@@ -44,6 +44,7 @@
 #include "VolumeManager.h"
 #include "ResponseCode.h"
 #include "Fat.h"
+#include "Exfat.h"
 #include "Ntfs.h"
 #include "Process.h"
 #include "cryptfs.h"
@@ -435,7 +436,7 @@ int Volume::mountVol() {
 
         errno = 0;
         setState(Volume::State_Checking);
-
+#if 0
         bool isFatFs = true;
         if (Fat::check(devicePath)) {
             if (errno == ENODATA) {
@@ -449,6 +450,7 @@ int Volume::mountVol() {
                 return -1;
             }
         }
+#endif
 
         /*
          * Mount the device on our internal staging mountpoint so we can
@@ -461,21 +463,39 @@ int Volume::mountVol() {
         // prevented users from writing to it. We don't want that.
         gid = AID_SDCARD_RW;
 
-        if (isFatFs) {
-            if (Fat::doMount(devicePath, "/mnt/secure/staging", false, false, false,
-                    AID_SYSTEM, gid, 0702, true)) {
-                SLOGE("%s failed to mount via VFAT (%s)\n", devicePath, strerror(errno));
-                continue;
-            }
-        } else {
-            if (Ntfs::doMount(devicePath, "/mnt/secure/staging", false, false, false,
-                    AID_SYSTEM, gid, 0702, true)) {
-                SLOGE("%s failed to mount via NTFS (%s)\n", devicePath, strerror(errno));
-                continue;
-            }
-        }
+        
+        if( !Exfat::check(devicePath) ) 
+		{
+			if( Exfat::doMount(devicePath, "/mnt/secure/staging", false, false, false, 
+                                  AID_SYSTEM, gid, 0702, true) )
+			{
+				SLOGE("%s failed to mount via ExFat (%s)\n", devicePath, strerror(errno));
+			}
+		}
+		else if( !Fat::check(devicePath)) 
+		{
+			if( Fat::doMount(devicePath, "/mnt/secure/staging", false, false, false, 
+                                AID_SYSTEM, gid, 0702, true) )
+			{
+				SLOGE("%s failed to mount via VFAT (%s)\n", devicePath, strerror(errno));
+			}
+		}
+		else if( !Ntfs::check(devicePath)) 
+		{
+			if( Ntfs::doMount(devicePath, "/mnt/secure/staging", false, false, false, 
+                                 AID_SYSTEM, gid, 0702, true) )
+			{
+				SLOGE("%s failed to mount via NTFS (%s)\n", devicePath, strerror(errno));
+			}
+		}		 
+		else
+		{
+			SLOGE("%s failed FS checks (%s)", devicePath, strerror(errno));
+            setState(Volume::State_Idle);
+            continue;
+		}   
 
-        SLOGI("Device %s, target %s mounted @ /mnt/secure/staging", devicePath, getMountpoint());
+                SLOGI("Device %s, target %s mounted @ /mnt/secure/staging", devicePath, getMountpoint());
 
         protectFromAutorunStupidity();
 

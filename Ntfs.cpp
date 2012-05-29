@@ -38,20 +38,42 @@
 
 #include "Ntfs.h"
 
+static char FSCK_NTFS3G_PATH[] 	="/system/bin/ntfs-3g.probe";
+static char MOUNT_NTFS3G_PATH[] ="/system/bin/ntfs-3g";
+
 extern "C" int logwrap(int argc, const char **argv, int background);
 extern "C" int mount(const char *, const char *, const char *, unsigned long, const void *);
 
 int Ntfs::check(const char *fsPath) {
-  
-    // no NTFS file system check is performed, always return true
-    SLOGI("Ntfs filesystem: Skipping fs checks\n");
-    return 0;
+    ALOGV("Ntfs::check");
+	const char *args[4];
+	int rc;
+	
+	if (access(FSCK_NTFS3G_PATH, X_OK)) {
+        SLOGW("Skipping fs checks\n");
+        return 0;
+    }
+	
+	/* we first mount it read and write*/
+    args[0] = FSCK_NTFS3G_PATH;
+    args[1] = "--readwrite";        
+    args[2] = fsPath;
+    args[3] = NULL;
 
+    rc = logwrap(3, args, 1);
+	if( (rc != 0) && (rc !=15) )
+	{	
+       SLOGE("Filesystem check failed (unknown exit code %d)", rc);
+	   return -1;
+    }
+	
+    return 0;
 }
 
 int Ntfs::doMount(const char *fsPath, const char *mountPoint,
                  bool ro, bool remount, bool executable,
                  int ownerUid, int ownerGid, int permMask, bool createLost) {
+#if 0
     int rc;
     unsigned long flags;
     char mountData[255];
@@ -92,12 +114,29 @@ int Ntfs::doMount(const char *fsPath, const char *mountPoint,
     }
 
     return rc;
+#else
+    int rc;
+    const char *args[11];
+    char mountData[255];
+
+    sprintf(mountData,
+            "locale=utf8,uid=%d,gid=%d,fmask=%o,dmask=%o,noatime,nodiratime",
+            ownerUid, ownerGid, permMask, permMask);
+
+    args[0] = MOUNT_NTFS3G_PATH;
+    args[1] = fsPath;
+    args[2] = mountPoint;
+    args[3] = "-o";
+    args[4] = mountData;
+    args[5] = NULL;
+    rc = logwrap(5, args, 1);
+
+    return rc;
+#endif
+
 }
 
 int Ntfs::format(const char *fsPath, unsigned int numSectors) {
-    
-    SLOGE("Format ntfs filesystem not supported\n");
-    errno = EIO;
-    return -1;
-
+    SLOGW("[lkj]:Skipping ntfs format\n");
+    return 0;
 }
