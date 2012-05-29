@@ -12,6 +12,7 @@ common_src_files := \
 	logwrapper.c \
 	Process.cpp \
 	Fat.cpp \
+	Exfat.cpp \
 	Ntfs.cpp \
 	Loop.cpp \
 	Devmapper.cpp \
